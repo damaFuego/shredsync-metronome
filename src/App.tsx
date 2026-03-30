@@ -223,13 +223,15 @@ export default function App() {
     subdivision: 'quarter',
   });
 
+  const [isSpeedTrainerMode, setIsSpeedTrainerMode] = useState(false);
+
   const { 
     bpm, 
     isPlaying, 
     togglePlay, 
     currentBeat, 
     currentBar 
-  } = useMetronome(config);
+  } = useMetronome(isSpeedTrainerMode ? config : { ...config, targetTempo: config.startTempo, increment: 0 });
 
   const [activeTab, setActiveTab] = useState('metronome');
   const [routines, setRoutines] = useState<Routine[]>(() => {
@@ -257,6 +259,12 @@ export default function App() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const [quoteOfTheDay, setQuoteOfTheDay] = useState('');
+
+  const [displayBpm, setDisplayBpm] = useState<string | number>(config.startTempo);
+
+  useEffect(() => {
+    setDisplayBpm(config.startTempo);
+  }, [config.startTempo]);
 
   useEffect(() => {
     setQuoteOfTheDay(MINDSET_QUOTES[Math.floor(Math.random() * MINDSET_QUOTES.length)]);
@@ -382,11 +390,50 @@ export default function App() {
 
                   {/* BPM Display */}
                   <div className="text-center z-10">
-                    <motion.span 
-                      className="block text-[5rem] font-headline font-bold leading-none tracking-tighter"
-                    >
-                      {bpm}
-                    </motion.span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      min="10"
+                      max="300"
+                      value={isPlaying ? bpm : displayBpm}
+                      onChange={(e) => {
+                        if (!isPlaying) {
+                          const val = e.target.value;
+                          setDisplayBpm(val);
+                          if (val !== '') {
+                            setConfig(prev => ({ ...prev, startTempo: parseInt(val, 10) }));
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        if (!isPlaying) {
+                          let val;
+                          if (e.target.value === '') {
+                            val = 100;
+                          } else {
+                            val = parseInt(e.target.value, 10);
+                            if (isNaN(val) || val < 10) val = 10;
+                            if (val > 300) val = 300;
+                          }
+                          setDisplayBpm(val);
+                          setConfig(prev => ({ ...prev, startTempo: val }));
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      onFocus={() => {
+                        if (!isPlaying) {
+                          setDisplayBpm('');
+                        }
+                      }}
+                      readOnly={isPlaying}
+                      disabled={isPlaying}
+                      className="block w-full bg-transparent text-center outline-none border-none appearance-none text-[5rem] font-headline font-bold leading-none tracking-tighter [&::-webkit-inner-spin-button]:appearance-none m-0 p-0 caret-transparent"
+                    />
                     <span className="text-primary font-headline font-bold tracking-[0.2em] uppercase text-sm">
                       BPM
                     </span>
@@ -429,6 +476,29 @@ export default function App() {
 
               {/* Control Grid */}
               <section className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 bg-gray-800/50 p-1 rounded-full flex w-full max-w-md mx-auto mb-2">
+                  <button
+                    onClick={() => setIsSpeedTrainerMode(false)}
+                    className={`flex-1 py-2 rounded-full font-headline font-bold text-sm transition-all ${
+                      !isSpeedTrainerMode
+                        ? 'bg-[#81ecff] text-black shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Standard
+                  </button>
+                  <button
+                    onClick={() => setIsSpeedTrainerMode(true)}
+                    className={`flex-1 py-2 rounded-full font-headline font-bold text-sm transition-all ${
+                      isSpeedTrainerMode
+                        ? 'bg-[#81ecff] text-black shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Speed Trainer
+                  </button>
+                </div>
+
                 <div className="col-span-2 bg-surface-low p-4 rounded-xl border border-white/5 flex flex-col gap-3">
                   <span className="text-primary font-headline font-bold text-[10px] uppercase tracking-widest opacity-80">
                     Subdivision
@@ -473,7 +543,7 @@ export default function App() {
                   </div>
                 </div>
                 <ControlCard 
-                  label="Start Tempo" 
+                  label={isSpeedTrainerMode ? "Start Tempo" : "Tempo"} 
                   value={config.startTempo} 
                   unit="BPM" 
                   min={20}
@@ -481,34 +551,39 @@ export default function App() {
                   onIncrement={() => setConfig(prev => ({ ...prev, startTempo: prev.startTempo + 1 }))}
                   onDecrement={() => setConfig(prev => ({ ...prev, startTempo: Math.max(20, prev.startTempo - 1) }))}
                 />
-                <ControlCard 
-                  label="Target Tempo" 
-                  value={config.targetTempo} 
-                  unit="BPM" 
-                  min={config.startTempo}
-                  onChange={(val) => setConfig(prev => ({ ...prev, targetTempo: val }))}
-                  onIncrement={() => setConfig(prev => ({ ...prev, targetTempo: prev.targetTempo + 1 }))}
-                  onDecrement={() => setConfig(prev => ({ ...prev, targetTempo: Math.max(config.startTempo, prev.targetTempo - 1) }))}
-                />
-                <ControlCard 
-                  label="Increment" 
-                  value={config.increment} 
-                  unit="BPM" 
-                  prefix="+"
-                  min={1}
-                  onChange={(val) => setConfig(prev => ({ ...prev, increment: val }))}
-                  onIncrement={() => setConfig(prev => ({ ...prev, increment: prev.increment + 1 }))}
-                  onDecrement={() => setConfig(prev => ({ ...prev, increment: Math.max(1, prev.increment - 1) }))}
-                />
-                <ControlCard 
-                  label="Trigger" 
-                  value={config.triggerBars} 
-                  unit="BARS"
-                  min={1}
-                  onChange={(val) => setConfig(prev => ({ ...prev, triggerBars: val }))}
-                  onIncrement={() => setConfig(prev => ({ ...prev, triggerBars: prev.triggerBars + 1 }))}
-                  onDecrement={() => setConfig(prev => ({ ...prev, triggerBars: Math.max(1, prev.triggerBars - 1) }))}
-                />
+                
+                {isSpeedTrainerMode && (
+                  <>
+                    <ControlCard 
+                      label="Target Tempo" 
+                      value={config.targetTempo} 
+                      unit="BPM" 
+                      min={config.startTempo}
+                      onChange={(val) => setConfig(prev => ({ ...prev, targetTempo: val }))}
+                      onIncrement={() => setConfig(prev => ({ ...prev, targetTempo: prev.targetTempo + 1 }))}
+                      onDecrement={() => setConfig(prev => ({ ...prev, targetTempo: Math.max(config.startTempo, prev.targetTempo - 1) }))}
+                    />
+                    <ControlCard 
+                      label="Increment" 
+                      value={config.increment} 
+                      unit="BPM" 
+                      prefix="+"
+                      min={1}
+                      onChange={(val) => setConfig(prev => ({ ...prev, increment: val }))}
+                      onIncrement={() => setConfig(prev => ({ ...prev, increment: prev.increment + 1 }))}
+                      onDecrement={() => setConfig(prev => ({ ...prev, increment: Math.max(1, prev.increment - 1) }))}
+                    />
+                    <ControlCard 
+                      label="Trigger" 
+                      value={config.triggerBars} 
+                      unit="BARS"
+                      min={1}
+                      onChange={(val) => setConfig(prev => ({ ...prev, triggerBars: val }))}
+                      onIncrement={() => setConfig(prev => ({ ...prev, triggerBars: prev.triggerBars + 1 }))}
+                      onDecrement={() => setConfig(prev => ({ ...prev, triggerBars: Math.max(1, prev.triggerBars - 1) }))}
+                    />
+                  </>
+                )}
               </section>
 
               {/* Start Button */}
