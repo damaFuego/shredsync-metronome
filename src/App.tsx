@@ -279,6 +279,10 @@ export default function App() {
     togglePlay();
   };
 
+  const handleResetStats = () => {
+    setStats({ totalSessions: 0, highestBpm: 0 });
+  };
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAddingRoutine, setIsAddingRoutine] = useState(false);
   const [newRoutine, setNewRoutine] = useState<{
@@ -767,6 +771,14 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              <button
+                onClick={handleResetStats}
+                className="w-full py-3 rounded-xl border border-red-500/50 text-red-500 hover:bg-red-500/10 font-headline font-bold uppercase tracking-widest text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Reset Stats
+              </button>
 
               <div className="flex flex-col gap-4 mt-4">
                 <h3 className="font-headline font-bold text-lg text-white flex items-center gap-2">
