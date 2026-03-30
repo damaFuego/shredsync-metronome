@@ -1,0 +1,5 @@
+{
+  "name": "ShredSync",
+  "description": "A precision metronome and practice tool for musicians to build speed and accuracy.",
+  "requestFramePermissions": []
+}
