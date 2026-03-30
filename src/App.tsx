@@ -254,6 +254,8 @@ export default function App() {
     return { totalSessions: 0, highestBpm: 0 };
   });
 
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   const [quoteOfTheDay, setQuoteOfTheDay] = useState('');
 
   useEffect(() => {
@@ -281,6 +283,7 @@ export default function App() {
 
   const handleResetStats = () => {
     setStats({ totalSessions: 0, highestBpm: 0 });
+    setShowResetConfirm(false);
   };
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -772,13 +775,35 @@ export default function App() {
                 </div>
               </div>
 
-              <button
-                onClick={handleResetStats}
-                className="w-full py-3 rounded-xl border border-red-500/50 text-red-500 hover:bg-red-500/10 font-headline font-bold uppercase tracking-widest text-sm transition-colors flex items-center justify-center gap-2"
-              >
-                <Trash2 className="w-4 h-4" />
-                Reset Stats
-              </button>
+              {showResetConfirm ? (
+                <div className="bg-surface-low p-4 rounded-xl border border-red-500/30 flex flex-col gap-3">
+                  <p className="text-sm text-on-surface-variant text-center">
+                    Are you sure? This cannot be undone.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowResetConfirm(false)}
+                      className="flex-1 py-2 rounded-lg border border-white/10 hover:bg-white/5 font-headline font-bold uppercase tracking-widest text-xs transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleResetStats}
+                      className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white font-headline font-bold uppercase tracking-widest text-xs transition-colors"
+                    >
+                      Yes, Reset
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  className="w-full py-3 rounded-xl border border-red-500/50 text-red-500 hover:bg-red-500/10 font-headline font-bold uppercase tracking-widest text-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Reset Stats
+                </button>
+              )}
 
               <div className="flex flex-col gap-4 mt-4">
                 <h3 className="font-headline font-bold text-lg text-white flex items-center gap-2">
