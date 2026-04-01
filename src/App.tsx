@@ -213,6 +213,12 @@ function NavButton({ active, onClick, icon }: { active: boolean; onClick: () => 
   );
 }
 
+interface PracticeLog {
+  date: string;
+  routineName: string;
+  bpm: number;
+}
+
 export default function App() {
   const [config, setConfig] = useState<MetronomeConfig>({
     startTempo: 60,
@@ -251,12 +257,19 @@ export default function App() {
   const [stats, setStats] = useState(() => {
     const saved = localStorage.getItem('shredsync_stats');
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      return {
+        totalSessions: parsed.totalSessions || 0,
+        highestBpm: parsed.highestBpm || 0,
+        history: parsed.history || []
+      };
     }
-    return { totalSessions: 0, highestBpm: 0 };
+    return { totalSessions: 0, highestBpm: 0, history: [] as PracticeLog[] };
   });
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showLogModal, setShowLogModal] = useState(false);
+  const [logData, setLogData] = useState({ bpm: config.startTempo, routineName: routines[0]?.title || 'Custom Practice' });
 
   const [quoteOfTheDay, setQuoteOfTheDay] = useState('');
 
@@ -281,16 +294,35 @@ export default function App() {
 
   const handleTogglePlay = () => {
     if (isPlaying) {
-      setStats((prev: { totalSessions: number; highestBpm: number }) => ({
-        totalSessions: prev.totalSessions + 1,
-        highestBpm: Math.max(prev.highestBpm, bpm)
-      }));
+      if (isSpeedTrainerMode) {
+        setLogData({ bpm: bpm, routineName: routines[0]?.title || 'Custom Practice' });
+        setShowLogModal(true);
+      } else {
+        setStats((prev: any) => ({
+          ...prev,
+          totalSessions: prev.totalSessions + 1,
+          highestBpm: Math.max(prev.highestBpm, bpm)
+        }));
+      }
     }
     togglePlay();
   };
 
+  const handleLogSession = () => {
+    setStats((prev: any) => ({
+      ...prev,
+      totalSessions: prev.totalSessions + 1,
+      highestBpm: Math.max(prev.highestBpm, logData.bpm),
+      history: [
+        { date: new Date().toISOString(), routineName: logData.routineName, bpm: logData.bpm },
+        ...(prev.history || [])
+      ]
+    }));
+    setShowLogModal(false);
+  };
+
   const handleResetStats = () => {
-    setStats({ totalSessions: 0, highestBpm: 0 });
+    setStats({ totalSessions: 0, highestBpm: 0, history: [] as PracticeLog[] });
     setShowResetConfirm(false);
   };
 
@@ -902,6 +934,73 @@ export default function App() {
             >
               <User className="w-12 h-12 mb-4 opacity-20" />
               <p>Profile coming soon...</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Clean Run Logging Modal */}
+        <AnimatePresence>
+          {showLogModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-surface-low p-6 rounded-3xl border border-white/10 w-11/12 max-w-sm flex flex-col gap-6"
+              >
+                <h2 className="font-headline font-black text-2xl text-primary text-center uppercase tracking-widest">SHRED SESSION COMPLETE</h2>
+                
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">ROUTINE</label>
+                    <select
+                      value={logData.routineName}
+                      onChange={(e) => setLogData({ ...logData, routineName: e.target.value })}
+                      className="bg-surface p-3 rounded-xl border border-white/10 text-white outline-none focus:border-primary/50"
+                    >
+                      {routines.map(r => (
+                        <option key={r.id} value={r.title}>{r.title}</option>
+                      ))}
+                      <option value="Custom Practice">Custom Practice</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">TOP CLEAN SPEED (NO SLOP!)</label>
+                    <div className="flex items-center gap-2 bg-surface p-3 rounded-xl border border-white/10 focus-within:border-primary/50">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={logData.bpm}
+                        onChange={(e) => setLogData({ ...logData, bpm: parseInt(e.target.value) || 0 })}
+                        className="bg-transparent w-full text-white outline-none font-headline font-bold text-xl"
+                      />
+                      <span className="text-on-surface-variant font-bold text-sm">BPM</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-2">
+                  <button
+                    onClick={() => setShowLogModal(false)}
+                    className="flex-1 py-3 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 font-headline font-bold uppercase tracking-widest text-sm transition-colors"
+                  >
+                    Trash It (Sloppy)
+                  </button>
+                  <button
+                    onClick={handleLogSession}
+                    className="flex-1 py-3 rounded-xl bg-primary text-black hover:bg-[#6be0ff] font-headline font-bold uppercase tracking-widest text-sm transition-colors shadow-[0_0_20px_rgba(129,236,255,0.3)]"
+                  >
+                    Log Clean Run
+                  </button>
+                </div>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
