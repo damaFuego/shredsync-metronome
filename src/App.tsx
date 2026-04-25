@@ -16,6 +16,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useMetronome, MetronomeConfig } from './hooks/useMetronome';
 
 interface Routine extends MetronomeConfig {
@@ -270,6 +271,7 @@ export default function App() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
   const [logData, setLogData] = useState({ bpm: config.startTempo, routineName: routines[0]?.title || 'Custom Practice' });
+  const [graphFilter, setGraphFilter] = useState<string>('All');
 
   const [quoteOfTheDay, setQuoteOfTheDay] = useState('');
 
@@ -375,10 +377,73 @@ export default function App() {
       timeSignature: routine.timeSignature || '4/4',
       subdivision: routine.subdivision || 'quarter',
     });
+    setIsSpeedTrainerMode(true);
     setActiveTab('metronome');
   };
 
   const beatsPerBar = parseInt(config.timeSignature.split('/')[0], 10);
+
+  // Data Processing for Chart
+  const uniqueRoutines = Array.from(new Set(stats.history.map((log: PracticeLog) => log.routineName)));
+  
+  const chartData = stats.history
+    .filter((log: PracticeLog) => graphFilter === 'All' || log.routineName === graphFilter)
+    .sort((a: PracticeLog, b: PracticeLog) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map((log: PracticeLog) => {
+      const d = new Date(log.date);
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      return {
+        ...log,
+        date: `${monthNames[d.getMonth()]} ${d.getDate()}`
+      };
+    });
+
+  // Streak Logic
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const last7Days = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (6 - i));
+    
+    const hasLog = stats.history.some((log: PracticeLog) => {
+      const logDate = new Date(log.date);
+      return logDate.getFullYear() === d.getFullYear() &&
+             logDate.getMonth() === d.getMonth() &&
+             logDate.getDate() === d.getDate();
+    });
+
+    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    return {
+      dateObj: d,
+      dayName: dayNames[d.getDay()],
+      hasLog
+    };
+  });
+
+  let currentStreak = 0;
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    
+    const hasLog = stats.history.some((log: PracticeLog) => {
+      const logDate = new Date(log.date);
+      return logDate.getFullYear() === d.getFullYear() &&
+             logDate.getMonth() === d.getMonth() &&
+             logDate.getDate() === d.getDate();
+    });
+
+    if (hasLog) {
+      currentStreak++;
+    } else if (i === 0) {
+      // It's today, we can skip and check yesterday
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  const improvement = chartData.length >= 2 ? chartData[chartData.length - 1].bpm - chartData[0].bpm : 0;
 
   return (
     <div className="min-h-screen bg-background text-white font-body pb-32 selection:bg-primary selection:text-black">
@@ -403,8 +468,32 @@ export default function App() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="flex flex-col gap-8"
+              className="flex flex-col gap-4"
             >
+              {/* Mode Toggle Pill */}
+              <div className="bg-gray-800/50 p-1 rounded-full flex w-full max-w-xs mx-auto mt-2">
+                <button
+                  onClick={() => setIsSpeedTrainerMode(false)}
+                  className={`flex-1 py-2 rounded-full font-headline font-bold text-sm transition-all ${
+                    !isSpeedTrainerMode
+                      ? 'bg-[#81ecff] text-black shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Standard
+                </button>
+                <button
+                  onClick={() => setIsSpeedTrainerMode(true)}
+                  className={`flex-1 py-2 rounded-full font-headline font-bold text-sm transition-all ${
+                    isSpeedTrainerMode
+                      ? 'bg-[#81ecff] text-black shadow-md'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  Speed Trainer
+                </button>
+              </div>
+
               {/* Metronome Visualizer */}
               <section className="relative flex flex-col items-center justify-center py-4">
                 <div className="relative w-72 h-72 flex items-center justify-center">
@@ -508,29 +597,6 @@ export default function App() {
 
               {/* Control Grid */}
               <section className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 bg-gray-800/50 p-1 rounded-full flex w-full max-w-md mx-auto mb-2">
-                  <button
-                    onClick={() => setIsSpeedTrainerMode(false)}
-                    className={`flex-1 py-2 rounded-full font-headline font-bold text-sm transition-all ${
-                      !isSpeedTrainerMode
-                        ? 'bg-[#81ecff] text-black shadow-md'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    Standard
-                  </button>
-                  <button
-                    onClick={() => setIsSpeedTrainerMode(true)}
-                    className={`flex-1 py-2 rounded-full font-headline font-bold text-sm transition-all ${
-                      isSpeedTrainerMode
-                        ? 'bg-[#81ecff] text-black shadow-md'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    Speed Trainer
-                  </button>
-                </div>
-
                 <div className="col-span-2 bg-surface-low p-4 rounded-xl border border-white/5 flex flex-col gap-3">
                   <span className="text-primary font-headline font-bold text-[10px] uppercase tracking-widest opacity-80">
                     Subdivision
@@ -882,6 +948,21 @@ export default function App() {
                 </div>
               </div>
 
+              {/* STREAK CARD */}
+              <div className="bg-surface-low p-5 rounded-2xl border border-white/5 w-full mt-4">
+                <h3 className="font-headline font-bold text-white uppercase tracking-widest mb-4">
+                  CURRENT STREAK: {currentStreak} DAYS
+                </h3>
+                <div className="flex justify-between items-center">
+                  {last7Days.map((day, i) => (
+                    <div key={i} className="flex flex-col items-center gap-2">
+                      <div className={`w-4 h-4 rounded-full ${day.hasLog ? 'bg-primary shadow-[0_0_15px_rgba(129,236,255,0.4)]' : 'bg-white/5'}`} />
+                      <span className="text-[10px] font-bold text-on-surface-variant uppercase">{day.dayName}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {showResetConfirm ? (
                 <div className="bg-surface-low p-4 rounded-xl border border-red-500/30 flex flex-col gap-3">
                   <p className="text-sm text-on-surface-variant text-center">
@@ -911,6 +992,45 @@ export default function App() {
                   Reset Stats
                 </button>
               )}
+
+              <div className="bg-surface-low p-5 rounded-2xl border border-white/5 flex flex-col gap-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-headline font-bold tracking-widest text-primary uppercase">Speed Progress</h3>
+                  <select
+                    value={graphFilter}
+                    onChange={(e) => setGraphFilter(e.target.value)}
+                    className="bg-surface p-2 rounded-lg border border-white/10 text-white outline-none focus:border-primary/50 text-xs font-bold uppercase tracking-widest"
+                  >
+                    <option value="All">All Routines</option>
+                    {uniqueRoutines.map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {chartData.length === 0 ? (
+                  <div className="h-[250px] flex items-center justify-center">
+                    <p className="text-on-surface-variant italic text-center">Log a Clean Run to see your progress.</p>
+                  </div>
+                ) : (
+                  <>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                        <XAxis dataKey="date" stroke="rgba(255,255,255,0.3)" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} />
+                        <YAxis stroke="rgba(255,255,255,0.3)" fontSize={10} tickMargin={10} axisLine={false} tickLine={false} domain={['dataMin - 10', 'dataMax + 10']} />
+                        <Tooltip contentStyle={{ backgroundColor: '#1e1e1e', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }} itemStyle={{ color: '#81ecff', fontWeight: 'bold' }} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+                        <Bar dataKey="bpm" fill="#81ecff" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                    {improvement > 0 ? (
+                      <div className="text-green-400 font-bold tracking-wide mt-2">+{improvement} BPM Growth (Selected Routine)</div>
+                    ) : improvement < 0 ? (
+                      <div className="text-red-400 font-bold tracking-wide mt-2">{improvement} BPM (Slight Dip)</div>
+                    ) : null}
+                  </>
+                )}
+              </div>
 
               <div className="flex flex-col gap-4 mt-4">
                 <h3 className="font-headline font-bold text-lg text-white flex items-center gap-2">
