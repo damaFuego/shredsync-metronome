@@ -23,6 +23,7 @@ interface Routine extends MetronomeConfig {
   id: string;
   title: string;
   icon: React.ReactNode;
+  tabData?: string;
 }
 
 const METERS = ['2/4', '3/4', '4/4', '6/8', '9/8', '12/8'];
@@ -38,6 +39,12 @@ const ROUTINES: Routine[] = [
     timeSignature: '4/4',
     subdivision: 'quarter',
     icon: <Activity className="w-6 h-6 text-primary" />,
+    tabData: `e|-----------------------------------------1-2-3-4------------------------------|
+B|---------------------------------1-2-3-4--------------------------------------|
+G|-------------------------1-2-3-4----------------------------------------------|
+D|-----------------1-2-3-4------------------------------------------------------|
+A|---------1-2-3-4--------------------------------------------------------------|
+E|-1-2-3-4----------------------------------------------------------------------|`
   },
   {
     id: 'sweep-picking',
@@ -66,53 +73,90 @@ const RoutineCard: React.FC<{
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
 }> = ({ routine, onClick, onEdit, onDelete }) => {
+  const [isFlipped, setIsFlipped] = useState(false);
+
+  const handleCardClick = () => {
+    if (routine.tabData) {
+      setIsFlipped(!isFlipped);
+    } else {
+      onClick();
+    }
+  };
+
   return (
-    <motion.div
-      role="button"
-      tabIndex={0}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      className="w-full bg-surface-low p-5 rounded-2xl border border-white/5 flex items-center gap-5 text-left transition-colors hover:border-primary/30 group relative overflow-hidden cursor-pointer"
-    >
-      <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center border border-white/10 group-hover:border-primary/20 transition-colors">
-        {routine.icon}
-      </div>
-      <div className="flex-1 pr-16">
-        <h3 className="font-headline font-bold text-lg text-white group-hover:text-primary transition-colors">
-          {routine.title}
-        </h3>
-        <div className="flex gap-3 mt-1 text-[10px] font-headline font-bold uppercase tracking-widest text-on-surface-variant flex-wrap">
-          <span>{routine.startTempo}-{routine.targetTempo} BPM</span>
-          <span className="text-primary/40">•</span>
-          <span>+{routine.increment} BPM / {routine.triggerBars} BARS</span>
-          <span className="text-primary/40">•</span>
-          <span>{routine.timeSignature} TIME</span>
-          <span className="text-primary/40">•</span>
-          <span>{routine.subdivision || 'quarter'}</span>
+    <div className="w-full [perspective:1000px]">
+      <motion.div
+        className="relative w-full h-full"
+        style={{ transformStyle: 'preserve-3d' }}
+        animate={{ rotateY: isFlipped ? 180 : 0 }}
+        transition={{ duration: 0.6, type: "spring" }}
+      >
+        {/* Front of Card */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleCardClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleCardClick();
+            }
+          }}
+          className={`w-full bg-surface-low p-5 rounded-2xl border border-white/5 flex items-center gap-5 text-left transition-all duration-300 hover:border-primary/30 group relative overflow-hidden cursor-pointer ${routine.tabData ? 'min-h-[240px]' : ''} ${isFlipped ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'}`}
+        >
+          <div className="w-12 h-12 rounded-xl bg-surface flex items-center justify-center border border-white/10 group-hover:border-primary/20 transition-colors">
+            {routine.icon}
+          </div>
+          <div className="flex-1 pr-16">
+            <h3 className="font-headline font-bold text-lg text-white group-hover:text-primary transition-colors">
+              {routine.title}
+            </h3>
+            <div className="flex gap-3 mt-1 text-[10px] font-headline font-bold uppercase tracking-widest text-on-surface-variant flex-wrap">
+              <span>{routine.startTempo}-{routine.targetTempo} BPM</span>
+              <span className="text-primary/40">•</span>
+              <span>+{routine.increment} BPM / {routine.triggerBars} BARS</span>
+              <span className="text-primary/40">•</span>
+              <span>{routine.timeSignature} TIME</span>
+              <span className="text-primary/40">•</span>
+              <span>{routine.subdivision || 'quarter'}</span>
+            </div>
+          </div>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onEdit(e); }}
+              className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(e); }}
+              className="p-2 text-on-surface-variant hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+          {routine.tabData && <span className="absolute bottom-2 right-4 text-[10px] font-bold text-primary animate-pulse tracking-widest uppercase">Tap for Tab ⤵</span>}
         </div>
-      </div>
-      <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button 
-          onClick={onEdit}
-          className="p-2 text-on-surface-variant hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+
+        {/* Back of Card */}
+        <div 
+          className={`absolute inset-0 w-full h-full bg-surface-low rounded-2xl border border-primary/30 p-5 flex flex-col justify-between transition-all duration-300 ${isFlipped ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+          style={{ transform: 'rotateY(180deg)' }}
         >
-          <Pencil className="w-4 h-4" />
-        </button>
-        <button 
-          onClick={onDelete}
-          className="p-2 text-on-surface-variant hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    </motion.div>
+          <div className="flex-1 w-full bg-black/50 rounded-xl border border-white/5 p-4 mb-3 overflow-auto shadow-inner custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <pre className="text-[8px] sm:text-[10px] font-mono text-[#81ecff] block leading-tight tracking-widest">
+              {routine.tabData}
+            </pre>
+          </div>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onClick(); }} 
+            className="w-full py-3 mt-2 bg-primary text-black font-headline font-bold uppercase tracking-widest text-sm rounded-xl hover:bg-primary/90 transition-colors"
+          >
+            Start Shredding
+          </button>
+        </div>
+      </motion.div>
+    </div>
   );
 };
 
@@ -246,11 +290,15 @@ export default function App() {
     if (saved) {
       const parsed = JSON.parse(saved);
       // Re-hydrate React nodes to prevent render crashes
-      return parsed.map((r: any) => ({
-        ...r,
-        subdivision: r.subdivision || 'quarter',
-        icon: r.id === 'sweep-picking' ? <Zap className="w-6 h-6 text-primary" /> : <Activity className="w-6 h-6 text-primary" />
-      }));
+      return parsed.map((r: any) => {
+        const defaultRoutine = ROUTINES.find(dr => dr.id === r.id);
+        return {
+          ...r,
+          tabData: defaultRoutine?.tabData || r.tabData,
+          subdivision: r.subdivision || 'quarter',
+          icon: r.id === 'sweep-picking' ? <Zap className="w-6 h-6 text-primary" /> : <Activity className="w-6 h-6 text-primary" />
+        };
+      });
     }
     return ROUTINES;
   });
