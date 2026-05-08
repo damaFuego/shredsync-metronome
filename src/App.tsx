@@ -39,12 +39,12 @@ const ROUTINES: Routine[] = [
     timeSignature: '4/4',
     subdivision: 'quarter',
     icon: <Activity className="w-6 h-6 text-primary" />,
-    tabData: `e|-----------------------------------------1-2-3-4------------------------------|
-B|---------------------------------1-2-3-4--------------------------------------|
-G|-------------------------1-2-3-4----------------------------------------------|
-D|-----------------1-2-3-4------------------------------------------------------|
-A|---------1-2-3-4--------------------------------------------------------------|
-E|-1-2-3-4----------------------------------------------------------------------|`
+    tabData: `e|-----------------------------------------1-2-3-4-|
+B|---------------------------------1-2-3-4---------|
+G|-------------------------1-2-3-4-----------------|
+D|-----------------1-2-3-4-------------------------|
+A|---------1-2-3-4---------------------------------|
+E|-1-2-3-4-----------------------------------------|`
   },
   {
     id: 'sweep-picking',
@@ -72,7 +72,8 @@ const RoutineCard: React.FC<{
   onClick: () => void;
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
-}> = ({ routine, onClick, onEdit, onDelete }) => {
+  onStartShredding: () => void;
+}> = ({ routine, onClick, onEdit, onDelete, onStartShredding }) => {
   const [isFlipped, setIsFlipped] = useState(false);
 
   const handleCardClick = () => {
@@ -143,13 +144,13 @@ const RoutineCard: React.FC<{
           className={`absolute inset-0 w-full h-full bg-surface-low rounded-2xl border border-primary/30 p-5 flex flex-col justify-between transition-all duration-300 ${isFlipped ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
           style={{ transform: 'rotateY(180deg)' }}
         >
-          <div className="flex-1 w-full bg-black/50 rounded-xl border border-white/5 p-4 mb-3 overflow-auto shadow-inner custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            <pre className="text-[8px] sm:text-[10px] font-mono text-[#81ecff] block leading-tight tracking-widest">
+          <div className="flex-1 w-full flex flex-col justify-center bg-black/50 rounded-xl border border-white/5 p-4 mb-3 overflow-auto shadow-inner custom-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <pre className="text-[8px] sm:text-[9px] font-mono text-[#81ecff] block leading-tight overflow-x-auto w-fit mx-auto">
               {routine.tabData}
             </pre>
           </div>
           <button 
-            onClick={(e) => { e.stopPropagation(); onClick(); }} 
+            onClick={(e) => { e.stopPropagation(); onStartShredding(); }} 
             className="w-full py-3 mt-2 bg-primary text-black font-headline font-bold uppercase tracking-widest text-sm rounded-xl hover:bg-primary/90 transition-colors"
           >
             Start Shredding
@@ -281,7 +282,8 @@ export default function App() {
     isPlaying, 
     togglePlay, 
     currentBeat, 
-    currentBar 
+    currentBar,
+    isCountingIn
   } = useMetronome(isSpeedTrainerMode ? config : { ...config, targetTempo: config.startTempo, increment: 0 });
 
   const [activeTab, setActiveTab] = useState('metronome');
@@ -416,7 +418,7 @@ export default function App() {
     setIsAddingRoutine(true);
   };
 
-  const handleSelectRoutine = (routine: Routine) => {
+  const handleSelectRoutine = (routine: Routine, autoStart: boolean = false) => {
     setConfig({
       startTempo: routine.startTempo,
       targetTempo: routine.targetTempo,
@@ -427,6 +429,17 @@ export default function App() {
     });
     setIsSpeedTrainerMode(true);
     setActiveTab('metronome');
+
+    if (autoStart && !isPlaying) {
+      togglePlay(true, {
+        startTempo: routine.startTempo,
+        targetTempo: routine.targetTempo,
+        increment: routine.increment,
+        triggerBars: routine.triggerBars,
+        timeSignature: routine.timeSignature || '4/4',
+        subdivision: routine.subdivision || 'quarter'
+      });
+    }
   };
 
   const beatsPerBar = parseInt(config.timeSignature.split('/')[0], 10);
@@ -558,8 +571,15 @@ export default function App() {
                   />
 
                   {/* BPM Display */}
-                  <div className="text-center z-10">
-                    <input
+                  {isCountingIn ? (
+                    <div className="absolute inset-0 flex items-center justify-center z-20">
+                      <span className="text-[8rem] font-headline font-black text-[#81ecff] drop-shadow-[0_0_30px_rgba(129,236,255,0.8)] animate-pulse">
+                        {currentBeat + 1}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-center z-10">
+                      <input
                       type="number"
                       inputMode="numeric"
                       pattern="[0-9]*"
@@ -607,6 +627,7 @@ export default function App() {
                       BPM
                     </span>
                   </div>
+                  )}
 
                   {/* Beat Indicators */}
                   <div className="absolute -bottom-6 flex gap-3">
@@ -623,7 +644,7 @@ export default function App() {
               {/* Training Stats (Visible when playing) */}
               <div className="h-12">
                 <AnimatePresence>
-                  {isPlaying && (
+                  {isPlaying && !isCountingIn && (
                     <motion.div 
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -778,9 +799,10 @@ export default function App() {
                   <RoutineCard 
                     key={routine.id} 
                     routine={routine} 
-                    onClick={() => handleSelectRoutine(routine)} 
+                    onClick={() => handleSelectRoutine(routine, false)} 
                     onEdit={(e) => handleEditRoutine(routine, e)}
                     onDelete={(e) => handleDeleteRoutine(routine.id, e)}
+                    onStartShredding={() => handleSelectRoutine(routine, true)}
                   />
                 ))}
 

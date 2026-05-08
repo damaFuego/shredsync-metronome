@@ -14,6 +14,7 @@ export function useMetronome(config: MetronomeConfig) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentBeat, setCurrentBeat] = useState(0);
   const [currentBar, setCurrentBar] = useState(0);
+  const [isCountingIn, setIsCountingIn] = useState(false);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const nextNoteTimeRef = useRef(0);
@@ -21,8 +22,10 @@ export function useMetronome(config: MetronomeConfig) {
   const bpmRef = useRef(config.startTempo);
   const beatRef = useRef(0);
   const barRef = useRef(0);
+  const isCountingInRef = useRef(false);
+  const countInBeatRef = useRef(0);
   const configRef = useRef(config);
-  const beatQueue = useRef<{ beat: number; bar: number; time: number; bpm: number }[]>([]);
+  const beatQueue = useRef<{ beat: number; bar: number; time: number; bpm: number; isCountingIn: boolean }[]>([]);
   const requestAnimationFrameRef = useRef<number | null>(null);
 
   // Sync refs with state/props
@@ -73,53 +76,70 @@ export function useMetronome(config: MetronomeConfig) {
     const lookahead = 25.0; // milliseconds
 
     while (nextNoteTimeRef.current < audioContextRef.current.currentTime + scheduleAheadTime) {
-      const isFirstBeat = beatRef.current === 0;
-
-      // Handle Training Logic: Increment BPM every X bars
-      if (isFirstBeat && barRef.current > 0 && barRef.current % configRef.current.triggerBars === 0) {
-        const nextBpm = Math.min(bpmRef.current + configRef.current.increment, configRef.current.targetTempo);
-        if (nextBpm !== bpmRef.current) {
-          bpmRef.current = nextBpm;
-        }
-      }
-
       const secondsPerBeat = 60.0 / bpmRef.current;
-      
-      let subBeats = 1;
-      switch (configRef.current.subdivision) {
-        case 'eighth': subBeats = 2; break;
-        case 'triplet': subBeats = 3; break;
-        case 'sixteenth': subBeats = 4; break;
-        default: subBeats = 1; break;
-      }
-      
-      // Schedule audio for main beat and sub-beats
-      for (let i = 0; i < subBeats; i++) {
-        const subTime = nextNoteTimeRef.current + (i * secondsPerBeat / subBeats);
-        const noteType = i === 0 ? (isFirstBeat ? 'accent' : 'beat') : 'sub';
-        playClick(subTime, noteType);
-      }
-      
-      // Queue UI state update
-      const scheduledTime = nextNoteTimeRef.current;
-      const scheduledBeat = beatRef.current;
-      const scheduledBar = barRef.current;
-      
-      beatQueue.current.push({
-        beat: scheduledBeat,
-        bar: scheduledBar,
-        time: scheduledTime,
-        bpm: bpmRef.current
-      });
-
-      // Advance timing
-      nextNoteTimeRef.current += secondsPerBeat;
-      
-      // Advance beat and bar
       const beatsPerBar = parseInt(configRef.current.timeSignature.split('/')[0], 10);
-      beatRef.current = (beatRef.current + 1) % beatsPerBar;
-      if (beatRef.current === 0) {
-        barRef.current += 1;
+      
+      if (isCountingInRef.current) {
+        // COUNT-IN MODE: Quarter notes only, no bar incrementing
+        playClick(nextNoteTimeRef.current, 'beat');
+      
+        beatQueue.current.push({
+          beat: countInBeatRef.current, bar: 0, time: nextNoteTimeRef.current, bpm: bpmRef.current, isCountingIn: true
+        });
+      
+        nextNoteTimeRef.current += secondsPerBeat;
+        countInBeatRef.current += 1;
+      
+        if (countInBeatRef.current >= beatsPerBar) {
+          isCountingInRef.current = false; // End count-in, next loop starts normal play
+        }
+      } else {
+        const isFirstBeat = beatRef.current === 0;
+
+        // Handle Training Logic: Increment BPM every X bars
+        if (isFirstBeat && barRef.current > 0 && barRef.current % configRef.current.triggerBars === 0) {
+          const nextBpm = Math.min(bpmRef.current + configRef.current.increment, configRef.current.targetTempo);
+          if (nextBpm !== bpmRef.current) {
+            bpmRef.current = nextBpm;
+          }
+        }
+
+        let subBeats = 1;
+        switch (configRef.current.subdivision) {
+          case 'eighth': subBeats = 2; break;
+          case 'triplet': subBeats = 3; break;
+          case 'sixteenth': subBeats = 4; break;
+          default: subBeats = 1; break;
+        }
+        
+        // Schedule audio for main beat and sub-beats
+        for (let i = 0; i < subBeats; i++) {
+          const subTime = nextNoteTimeRef.current + (i * secondsPerBeat / subBeats);
+          const noteType = i === 0 ? (isFirstBeat ? 'accent' : 'beat') : 'sub';
+          playClick(subTime, noteType);
+        }
+        
+        // Queue UI state update
+        const scheduledTime = nextNoteTimeRef.current;
+        const scheduledBeat = beatRef.current;
+        const scheduledBar = barRef.current;
+        
+        beatQueue.current.push({
+          beat: scheduledBeat,
+          bar: scheduledBar,
+          time: scheduledTime,
+          bpm: bpmRef.current,
+          isCountingIn: false
+        });
+
+        // Advance timing
+        nextNoteTimeRef.current += secondsPerBeat;
+        
+        // Advance beat and bar
+        beatRef.current = (beatRef.current + 1) % beatsPerBar;
+        if (beatRef.current === 0) {
+          barRef.current += 1;
+        }
       }
     }
     timerIDRef.current = window.setTimeout(scheduler, lookahead);
@@ -137,6 +157,7 @@ export function useMetronome(config: MetronomeConfig) {
     }
     
     if (lastState) {
+      setIsCountingIn(lastState.isCountingIn);
       setCurrentBeat(lastState.beat);
       setCurrentBar(lastState.bar);
       setBpm(lastState.bpm);
@@ -145,8 +166,12 @@ export function useMetronome(config: MetronomeConfig) {
     requestAnimationFrameRef.current = requestAnimationFrame(draw);
   }, []);
 
-  const togglePlay = useCallback(() => {
+  const togglePlay = useCallback((startWithCountIn: boolean = false, overrideConfig?: MetronomeConfig) => {
     if (!isPlaying) {
+      if (overrideConfig) configRef.current = overrideConfig;
+      isCountingInRef.current = startWithCountIn;
+      countInBeatRef.current = 0;
+
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
@@ -191,6 +216,7 @@ export function useMetronome(config: MetronomeConfig) {
     bpm,
     setBpm,
     isPlaying,
+    isCountingIn,
     togglePlay,
     currentBeat,
     currentBar,
