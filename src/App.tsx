@@ -277,6 +277,19 @@ export default function App() {
 
   const [isSpeedTrainerMode, setIsSpeedTrainerMode] = useState(false);
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [appSettings, setAppSettings] = useState<{ soundPack: 'synth'|'wood'|'drum' }>(() => {
+    const saved = localStorage.getItem('shredsync_settings');
+    const parsed = saved ? JSON.parse(saved) : {};
+    return {
+      soundPack: parsed.soundPack || 'synth'
+    };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('shredsync_settings', JSON.stringify(appSettings));
+  }, [appSettings]);
+
   const { 
     bpm, 
     isPlaying, 
@@ -284,7 +297,10 @@ export default function App() {
     currentBeat, 
     currentBar,
     isCountingIn
-  } = useMetronome(isSpeedTrainerMode ? config : { ...config, targetTempo: config.startTempo, increment: 0 });
+  } = useMetronome(isSpeedTrainerMode 
+    ? { ...config, soundPack: appSettings.soundPack } 
+    : { ...config, targetTempo: config.startTempo, increment: 0, soundPack: appSettings.soundPack }
+  );
 
   const [activeTab, setActiveTab] = useState('metronome');
   const [routines, setRoutines] = useState<Routine[]>(() => {
@@ -516,7 +532,7 @@ export default function App() {
         <h1 className="text-2xl font-black text-primary tracking-widest uppercase font-headline">
           ShredSync
         </h1>
-        <button className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface transition-colors">
+        <button onClick={() => setIsSettingsOpen(true)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface transition-colors">
           <Settings className="w-6 h-6 text-primary" />
         </button>
       </header>
@@ -1189,6 +1205,40 @@ export default function App() {
                   >
                     Log Clean Run
                   </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isSettingsOpen && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center px-4"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+                className="bg-surface-low p-6 rounded-3xl border border-white/10 w-full max-w-sm flex flex-col gap-6"
+              >
+                <div className="flex justify-between items-center">
+                  <h2 className="font-headline font-black text-2xl text-primary uppercase tracking-widest">Settings</h2>
+                  <button onClick={() => setIsSettingsOpen(false)} className="text-on-surface-variant hover:text-white transition-colors">✕</button>
+                </div>
+                
+                <div className="flex flex-col gap-5">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Audio Engine Profile</label>
+                    <select
+                      value={appSettings.soundPack}
+                      onChange={(e) => setAppSettings({ ...appSettings, soundPack: e.target.value as any })}
+                      className="bg-surface p-3 rounded-xl border border-white/10 text-white outline-none focus:border-primary/50"
+                    >
+                      <option value="synth">Classic Synth (Square)</option>
+                      <option value="wood">Wooden Tick (Triangle)</option>
+                      <option value="drum">Deep Thud (Sine)</option>
+                    </select>
+                  </div>
                 </div>
               </motion.div>
             </motion.div>

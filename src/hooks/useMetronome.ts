@@ -7,6 +7,7 @@ export interface MetronomeConfig {
   triggerBars: number;
   timeSignature: string;
   subdivision?: 'quarter' | 'eighth' | 'triplet' | 'sixteenth';
+  soundPack?: 'synth' | 'wood' | 'drum';
 }
 
 export function useMetronome(config: MetronomeConfig) {
@@ -43,16 +44,26 @@ export function useMetronome(config: MetronomeConfig) {
     const osc = audioContextRef.current.createOscillator();
     const envelope = audioContextRef.current.createGain();
 
+    const pack = configRef.current.soundPack || 'synth';
     let targetVolume = 0.5;
-    if (noteType === 'accent') {
-      osc.frequency.value = 1200;
-      targetVolume = 0.5;
-    } else if (noteType === 'beat') {
-      osc.frequency.value = 800;
-      targetVolume = 0.5;
-    } else {
-      osc.frequency.value = 600;
-      targetVolume = 0.25;
+
+    if (pack === 'synth') {
+      osc.type = 'square';
+      if (noteType === 'accent') { osc.frequency.value = 1200; targetVolume = 0.5; }
+      else if (noteType === 'beat') { osc.frequency.value = 800; targetVolume = 0.5; }
+      else { osc.frequency.value = 600; targetVolume = 0.25; }
+    } 
+    else if (pack === 'wood') {
+      osc.type = 'triangle';
+      if (noteType === 'accent') { osc.frequency.value = 800; targetVolume = 0.8; }
+      else if (noteType === 'beat') { osc.frequency.value = 400; targetVolume = 0.8; }
+      else { osc.frequency.value = 300; targetVolume = 0.4; }
+    }
+    else if (pack === 'drum') {
+      osc.type = 'sine'; // Deep thud
+      if (noteType === 'accent') { osc.frequency.value = 200; targetVolume = 0.9; }
+      else if (noteType === 'beat') { osc.frequency.value = 150; targetVolume = 0.9; }
+      else { osc.frequency.value = 100; targetVolume = 0.5; }
     }
     
     // Micro-fade-in to prevent popping
